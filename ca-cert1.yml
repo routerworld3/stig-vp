@@ -1,0 +1,36 @@
+---
+- name: Download bundle.pem.p7b and update CA trust
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    s3_bucket: "your-s3-bucket"
+    bundle_file: "bundle.pem.p7b"
+    local_bundle_file: "/path/to/local/bundle.pem.p7b"
+    local_cert_path: "/path/to/local/"
+
+  tasks:
+    - name: Install required Python packages
+      pip:
+        name:
+          - boto
+          - botocore
+
+    - name: Download bundle.pem.p7b from S3 bucket
+      aws_s3:
+        bucket: "{{ s3_bucket }}"
+        object: "{{ bundle_file }}"
+        dest: "{{ local_bundle_file }}"
+
+    - name: Convert bundle.pem.p7b to individual certificates
+      shell: |
+        openssl pkcs7 -print_certs -in {{ local_bundle_file }} |
+        awk '/subject=/ {print > "{{ local_cert_path }}cert." ++c ".pem"}'
+
+    - name: Update CA trust
+      block:
+        - name: Update CA trust on Red Hat systems
+          command: update-ca-trust
+
+        - name: Update CA trust on Ubuntu systems
+          command: update-ca-certificates
